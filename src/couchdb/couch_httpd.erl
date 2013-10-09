@@ -559,7 +559,8 @@ body(#httpd{req_body=ReqBody}) ->
     ReqBody.
 
 json_body(Httpd) ->
-    ?JSON_DECODE(body(Httpd)).
+    Body = body(Httpd),
+    ?JSON_DECODE(maybe_decompress(Httpd, Body)).
 
 json_body_obj(Httpd) ->
     case json_body(Httpd) of
@@ -569,6 +570,15 @@ json_body_obj(Httpd) ->
     end.
 
 
+maybe_decompress(Httpd, Body) ->
+    case header_value(Httpd, "Content-Encoding", "identity") of
+        "gzip" ->
+            zlib:gunzip(Body);
+        "identity" ->
+            Body;
+        Else ->
+            throw({bad_ctype, [Else, " is not a supported content encoding."]})
+    end.
 
 doc_etag(#doc{revs={Start, [DiskRev|_]}}) ->
     "\"" ++ ?b2l(couch_doc:rev_to_str({Start, DiskRev})) ++ "\"".
