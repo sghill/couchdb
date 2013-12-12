@@ -24,7 +24,9 @@ function(app, Components, FauxtonAPI, Databases) {
   Views.Item = FauxtonAPI.View.extend({
     template: "templates/databases/item",
     tagName: "tr",
-
+    establish: function(){
+      return [this.model.fetch()];
+    },
     serialize: function() {
       return {
         encoded: encodeURIComponent(this.model.get("name")),
@@ -36,7 +38,7 @@ function(app, Components, FauxtonAPI, Databases) {
 
   Views.List = FauxtonAPI.View.extend({
     dbLimit: 20,
-    perPage: 20,
+    perPage: 10,
     template: "templates/databases/list",
     events: {
       "click button.all": "selectAll",
@@ -54,7 +56,19 @@ function(app, Components, FauxtonAPI, Databases) {
         databases: this.collection
       };
     },
+    establish: function(){
+      var currentDBs = this.paginated();
+      var deferred = FauxtonAPI.Deferred();
 
+      FauxtonAPI.when(currentDBs.map(function(database) {
+        return database.status.fetch();
+      })).always(function(resp) {
+        //make this always so that even if a user is not allowed access to a database
+        //they will still see a list of all databases
+        deferred.resolve();
+      });
+      return [deferred];
+    },
     switchDatabase: function(event, selectedName) {
       event && event.preventDefault();
 
@@ -79,6 +93,7 @@ function(app, Components, FauxtonAPI, Databases) {
       return this.collection.slice(start, end);
     },
 
+
     beforeRender: function() {
 
       this.insertView("#newButton", new Views.NewDatabaseButton({
@@ -86,10 +101,12 @@ function(app, Components, FauxtonAPI, Databases) {
       }));
 
       _.each(this.paginated(), function(database) {
+        console.log(database);
         this.insertView("table.databases tbody", new Views.Item({
           model: database
         }));
       }, this);
+
 
       this.insertView("#database-pagination", new Components.Pagination({
         page: this.page,
