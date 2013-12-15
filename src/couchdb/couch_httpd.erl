@@ -573,7 +573,11 @@ json_body_obj(Httpd) ->
 maybe_decompress(Httpd, Body) ->
     case header_value(Httpd, "Content-Encoding", "identity") of
         "gzip" ->
-            zlib:gunzip(Body);
+            try
+                zlib:gunzip(Body)
+            catch error:data_error ->
+                throw({bad_request, "Request body is not properly gzipped."})
+            end;
         "identity" ->
             Body;
         Else ->
